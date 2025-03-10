@@ -5277,13 +5277,33 @@ public:
 
 		bool ret_val = true;
 
+		// Here we do something different
+		
+		std::vector<MPI_Status> statuses;
+		statuses.resize(this->all_current_requests.size());
+		ret_val = MPI_Waitall(all_current_requests.size(), all_current_requests.data(), statuses[0].data());
+		if (ret_val != MPI_SUCCESS) {
+			for (const auto& status: statuses) {
+				if (status.MPI_ERROR != MPI_SUCCESS) {
+					ret_val = false;
+					std::cerr << __FILE__ << ":" << __LINE__
+						<< " MPI receive failed from process " << status.MPI_SOURCE
+						<< " with tag " << status.MPI_TAG
+						<< std::endl;
+				}
+			}
+		}
+
+		all_current_requests.clear();
+		/*
+		Not needed anymore
 		if (!this->wait_remote_neighbor_copy_update_receives(neighborhood_id)) {
 			ret_val = false;
 		}
 		if (!this->wait_remote_neighbor_copy_update_sends()) {
 			ret_val = false;
 		}
-
+		*/
 		return ret_val;
 	}
 
@@ -6976,6 +6996,9 @@ private:
 		int,
 		std::vector<MPI_Request>
 	> send_requests, receive_requests;
+
+
+	std::vector<MPI_Request> all_current_requests;
 
 	// cells whose data has to be received / sent by this process from the process as the key
 	std::unordered_map<int, std::vector<std::pair<uint64_t, int>>>
@@ -9445,8 +9468,9 @@ private:
 					if (destination.count(cell) == 0) {
 						destination[cell];
 					}
-
-					this->receive_requests[sending_process].push_back(MPI_Request());
+					auto request = MPI_Request();
+					this->receive_requests[sending_process].push_back(request);
+					this->all_current_requests.push_back(request);
 
 					void* address = NULL;
 					int count = -1;
@@ -9577,8 +9601,9 @@ private:
 						<< std::endl;
 					abort();
 				}
-
-				this->receive_requests[sending_process].push_back(MPI_Request());
+				auto request = MPI_Request()
+				this->receive_requests[sending_process].push_back(request);
+				this->all_current_requests.push_back(request);
 
 				ret_val = MPI_Irecv(
 					addresses[0],
@@ -9647,8 +9672,10 @@ private:
 
 				for(const auto& item : receiver.second) {
 					const uint64_t cell = item.first;
+					auto request = MPI_Request()
+					this->send_requests[receiving_process].push_back(request);
+					this->all_current_requests.push_back(request);
 
-					this->send_requests[receiving_process].push_back(MPI_Request());
 
 					void* address = NULL;
 					int count = -1;
@@ -9771,8 +9798,9 @@ private:
 						<< std::endl;
 					abort();
 				}
-
-				this->send_requests[receiving_process].push_back(MPI_Request());
+				auto request = MPI_Request();
+				this->send_requests[receiving_process].push_back();
+				this->all_current_requests.push_back(request);
 
 				ret_val = MPI_Isend(
 					addresses[0],
