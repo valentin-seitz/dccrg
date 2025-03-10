@@ -5273,8 +5273,8 @@ public:
 		
 		std::vector<MPI_Status> statuses;
 		statuses.resize(this->all_current_requests.size());
-		ret_val = MPI_Waitall(all_current_requests.size(), all_current_requests.data(), statuses.data());
-		if (ret_val != MPI_SUCCESS) {
+		auto mpi_ret = MPI_Waitall(all_current_requests.size(), all_current_requests.data(), statuses.data());
+		if (mpi_ret != MPI_SUCCESS) {
 			for (const auto& status: statuses) {
 				if (status.MPI_ERROR != MPI_SUCCESS) {
 					ret_val = false;
@@ -5285,12 +5285,10 @@ public:
 				}
 			}
 		}
-		// Free the request handles
-		for(auto &request: all_current_requests){
-			MPI_Request_free(&request);
-		}
-
+		
 		all_current_requests.clear();
+
+		return ret_val;
 
 	}
 
