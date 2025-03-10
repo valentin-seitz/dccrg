@@ -51,6 +51,7 @@ dccrg::Dccrg for a starting point in the API.
 #include "mpi.h"
 #include "zoltan.h"
 
+
 #ifdef USE_SFC
 #include "sfc++.hpp"
 #endif
@@ -3605,8 +3606,12 @@ public:
 			-3
 		);
 
+
+		this->wait_for_all_transfers();
+		/*
 		this->wait_user_data_transfer_receives();
 		this->wait_user_data_transfer_sends();
+		*/
 		return *this;
 	}
 
@@ -4076,9 +4081,13 @@ public:
 			-2
 		);
 
+		this->wait_for_all_transfers();
+		/*
+
 		this->wait_user_data_transfer_receives();
 
 		this->wait_user_data_transfer_sends();
+		*/
 		return *this;
 	}
 
@@ -5258,6 +5267,33 @@ public:
 		return ret_val;
 	}
 
+	bool wait_for_all_transfers(){
+
+		bool ret_val = true;
+		
+		std::vector<MPI_Status> statuses;
+		statuses.resize(this->all_current_requests.size());
+		ret_val = MPI_Waitall(all_current_requests.size(), all_current_requests.data(), statuses.data());
+		if (ret_val != MPI_SUCCESS) {
+			for (const auto& status: statuses) {
+				if (status.MPI_ERROR != MPI_SUCCESS) {
+					ret_val = false;
+					std::cerr << __FILE__ << ":" << __LINE__
+						<< " MPI receive failed from process " << status.MPI_SOURCE
+						<< " with tag " << status.MPI_TAG
+						<< std::endl;
+				}
+			}
+		}
+		// Free the request handles
+		for(auto &request: all_current_requests){
+			MPI_Request_free(&request);
+		}
+
+		all_current_requests.clear();
+
+	}
+
 
 	/*!
 	Finishes what start_remote_neighbor_data_update() started.
@@ -5275,26 +5311,7 @@ public:
 			abort();
 		}
 
-		bool ret_val = true;
-
-		// Here we do something different
-		
-		std::vector<MPI_Status> statuses;
-		statuses.resize(this->all_current_requests.size());
-		ret_val = MPI_Waitall(all_current_requests.size(), all_current_requests.data(), statuses[0].data());
-		if (ret_val != MPI_SUCCESS) {
-			for (const auto& status: statuses) {
-				if (status.MPI_ERROR != MPI_SUCCESS) {
-					ret_val = false;
-					std::cerr << __FILE__ << ":" << __LINE__
-						<< " MPI receive failed from process " << status.MPI_SOURCE
-						<< " with tag " << status.MPI_TAG
-						<< std::endl;
-				}
-			}
-		}
-
-		all_current_requests.clear();
+		bool ret_val = this->wait_for_all_transfers();
 		/*
 		Not needed anymore
 		if (!this->wait_remote_neighbor_copy_update_receives(neighborhood_id)) {
@@ -5344,16 +5361,21 @@ public:
 		}
 
 		bool ret_val = true;
-
+		/*
 		if (neighborhood_id == default_neighborhood_id) {
 			return this->wait_user_data_transfer_receives();
 		}
-
+		*/
 		if (this->user_hood_of.count(neighborhood_id) == 0) {
 			ret_val = false;
 		}
+		/*
 
 		if (!this->wait_user_data_transfer_receives()) {
+			ret_val = false;
+		}
+		*/
+		if(!this->wait_for_all_transfers()){
 			ret_val = false;
 		}
 
@@ -9468,9 +9490,9 @@ private:
 					if (destination.count(cell) == 0) {
 						destination[cell];
 					}
-					auto request = MPI_Request();
-					this->receive_requests[sending_process].push_back(request);
-					this->all_current_requests.push_back(request);
+					//auto request = MPI_Request();
+					//this->receive_requests[sending_process].push_back(request);
+					this->all_current_requests.emplace_back();
 
 					void* address = NULL;
 					int count = -1;
@@ -9512,7 +9534,7 @@ private:
 						sending_process,
 						item.second,
 						this->comm,
-						&(this->receive_requests[sending_process].back())
+						&(this->all_current_requests.back())
 					);
 
 					if (ret_val != MPI_SUCCESS) {
@@ -9601,9 +9623,9 @@ private:
 						<< std::endl;
 					abort();
 				}
-				auto request = MPI_Request()
-				this->receive_requests[sending_process].push_back(request);
-				this->all_current_requests.push_back(request);
+				//auto request = MPI_Request()
+				//this->receive_requests[sending_process].push_back(request);
+				this->all_current_requests.emplace_back();
 
 				ret_val = MPI_Irecv(
 					addresses[0],
@@ -9612,7 +9634,7 @@ private:
 					sending_process,
 					0,
 					this->comm,
-					&(this->receive_requests[sending_process].back())
+					&(this->all_current_requests.back())
 				);
 				if (ret_val != MPI_SUCCESS) {
 					std::cerr << __FILE__ << ":" << __LINE__
@@ -9672,9 +9694,9 @@ private:
 
 				for(const auto& item : receiver.second) {
 					const uint64_t cell = item.first;
-					auto request = MPI_Request()
-					this->send_requests[receiving_process].push_back(request);
-					this->all_current_requests.push_back(request);
+					//auto request = MPI_Request();
+					//this->send_requests[receiving_process].push_back(request);
+					this->all_current_requests.emplace_back();
 
 
 					void* address = NULL;
@@ -9717,7 +9739,7 @@ private:
 						receiving_process,
 						item.second,
 						this->comm,
-						&(this->send_requests[receiving_process].back())
+						&(this->all_current_requests.back())
 					);
 
 					if (ret_val != MPI_SUCCESS) {
@@ -9798,9 +9820,9 @@ private:
 						<< std::endl;
 					abort();
 				}
-				auto request = MPI_Request();
-				this->send_requests[receiving_process].push_back();
-				this->all_current_requests.push_back(request);
+				//auto request = MPI_Request();
+				//this->send_requests[receiving_process].push_back();
+				this->all_current_requests.emplace_back();
 
 				ret_val = MPI_Isend(
 					addresses[0],
@@ -9809,7 +9831,7 @@ private:
 					receiving_process,
 					0,
 					this->comm,
-					&(this->send_requests[receiving_process].back())
+					&(this->all_current_requests.back())
 				);
 				if (ret_val != MPI_SUCCESS) {
 					std::cerr << __FILE__ << ":" << __LINE__
