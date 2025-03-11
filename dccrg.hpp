@@ -3608,10 +3608,7 @@ public:
 
 
 		this->wait_for_all_transfers();
-		/*
-		this->wait_user_data_transfer_receives();
-		this->wait_user_data_transfer_sends();
-		*/
+
 		return *this;
 	}
 
@@ -4082,12 +4079,6 @@ public:
 		);
 
 		this->wait_for_all_transfers();
-		/*
-
-		this->wait_user_data_transfer_receives();
-
-		this->wait_user_data_transfer_sends();
-		*/
 		return *this;
 	}
 
@@ -5289,7 +5280,6 @@ public:
 		all_current_requests.clear();
 
 		return ret_val;
-
 	}
 
 
@@ -5310,75 +5300,10 @@ public:
 		}
 
 		bool ret_val = this->wait_for_all_transfers();
-		/*
-		Not needed anymore
-		if (!this->wait_remote_neighbor_copy_update_receives(neighborhood_id)) {
-			ret_val = false;
-		}
-		if (!this->wait_remote_neighbor_copy_update_sends()) {
-			ret_val = false;
-		}
-		*/
 		return ret_val;
 	}
 
 
-	/*!
-	Waits for sends started by start_remote_neighbor_copy_updates().
-
-	\see
-	start_remote_neighbor_copy_updates()
-	*/
-	bool wait_remote_neighbor_copy_update_sends()
-	{
-		if (this->balancing_load) {
-			std::cerr << __FILE__ << ":" << __LINE__
-				<< " wait_remote_neighbor_copy_update_sends() called while balancing load"
-				<< std::endl;
-			abort();
-		}
-
-		return this->wait_user_data_transfer_sends();
-	}
-
-
-	/*!
-	Waits for receives started by start_remote_neighbor_copy_updates().
-
-	\see
-	start_remote_neighbor_copy_updates()
-	*/
-	bool wait_remote_neighbor_copy_update_receives(
-		const int neighborhood_id = default_neighborhood_id
-	) {
-		if (this->balancing_load) {
-			std::cerr << __FILE__ << ":" << __LINE__
-				<< " wait_remote_neighbor_copy_update_receives(...) called while balancing load"
-				<< std::endl;
-			abort();
-		}
-
-		bool ret_val = true;
-		/*
-		if (neighborhood_id == default_neighborhood_id) {
-			return this->wait_user_data_transfer_receives();
-		}
-		*/
-		if (this->user_hood_of.count(neighborhood_id) == 0) {
-			ret_val = false;
-		}
-		/*
-
-		if (!this->wait_user_data_transfer_receives()) {
-			ret_val = false;
-		}
-		*/
-		if(!this->wait_for_all_transfers()){
-			ret_val = false;
-		}
-
-		return ret_val;
-	}
 
 
 	/*!
@@ -9860,76 +9785,6 @@ private:
 		return true;
 	}
 
-
-	/*!
-	Waits for the receives of user data transfers between processes to complete.
-
-	User data arriving to this process is saved in given destination.
-	*/
-	bool wait_user_data_transfer_receives()
-	{
-		bool success = true;
-		int ret_val = -1;
-
-		// Collate all requests into one list, and wait for all in one go.
-		std::vector<MPI_Request> allRequests;
-		for( const auto& process : this->receive_requests) {
-			allRequests.insert(allRequests.end(), process.second.begin(), process.second.end());
-		}
-		std::vector<MPI_Status> statuses;
-		statuses.resize(allRequests.size());
-		ret_val = MPI_Waitall(allRequests.size(), &allRequests[0], &(statuses[0]));
-		if (ret_val != MPI_SUCCESS) {
-			for (const auto& status: statuses) {
-				if (status.MPI_ERROR != MPI_SUCCESS) {
-					success = false;
-					std::cerr << __FILE__ << ":" << __LINE__
-						<< " MPI receive failed from process " << status.MPI_SOURCE
-						<< " with tag " << status.MPI_TAG
-						<< std::endl;
-				}
-			}
-		}
-
-		this->receive_requests.clear();
-
-		return success;
-	}
-
-
-	/*!
-	Waits for the sends of user data transfers between processes to complete.
-	*/
-	bool wait_user_data_transfer_sends()
-	{
-		bool success = true;
-		int ret_val = -1;
-
-		// Collate all requests into one list, and wait for all in one go.
-		std::vector<MPI_Request> allRequests;
-		for( const auto& process : this->send_requests) {
-			allRequests.insert(allRequests.end(), process.second.begin(), process.second.end());
-		}
-		std::vector<MPI_Status> statuses;
-		statuses.resize(allRequests.size());
-		ret_val = MPI_Waitall(allRequests.size(), &allRequests[0], &(statuses[0]));
-
-		if (ret_val != MPI_SUCCESS) {
-			for (const auto& status: statuses) {
-				if (status.MPI_ERROR != MPI_SUCCESS) {
-					std::cerr << __FILE__ << ":" << __LINE__
-						<< " MPI receive failed from process " << status.MPI_SOURCE
-						<< " with tag " << status.MPI_TAG
-						<< std::endl;
-					success = false;
-				}
-			}
-		}
-
-		this->send_requests.clear();
-
-		return success;
-	}
 
 public:
 	/*!
