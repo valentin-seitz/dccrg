@@ -9401,7 +9401,7 @@ private:
  		std::shuffle(receive_item_keys.begin(), receive_item_keys.end(), g);
 
 		for(const auto& sending_process : receive_item_keys) {
-			const auto& receives = receive_item[sending_process];
+			const auto& receives = receive_item.at(sending_process);
 			const size_t number_of_receives = receives.size();
 
 			#ifdef DEBUG
@@ -9622,7 +9622,7 @@ private:
  		std::shuffle(send_item_keys.begin(), send_item_keys.end(), g);
 
 		for(const auto& receiving_process : send_item_keys) {
-			const auto& sends = send_item[receiving_process];
+			const auto& sends = send_item.at(receiving_process);
 			const size_t number_of_sends = sends.size();
 
 			#ifdef DEBUG
