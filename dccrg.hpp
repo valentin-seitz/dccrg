@@ -48,6 +48,7 @@ dccrg::Dccrg for a starting point in the API.
 #include "unordered_map"
 #include "unordered_set"
 #include "vector"
+#include <random>
 #include "mpi.h"
 #include "zoltan.h"
 
@@ -9450,9 +9451,20 @@ private:
 		const std::unordered_map<int, std::vector<std::pair<uint64_t, int>>>& receive_item,
 		const int neighborhood_id
 	) {
-		for(const auto& sender : receive_item) {
-			const int sending_process = sender.first;
-			const size_t number_of_receives = sender.second.size();
+		std::vector<int> receive_item_keys;
+		receive_item_keys.reserve(receive_item.size());
+		// build up vector of keys
+		for(auto const& [key, val] : receive_item){
+			receive_item_keys.push_back(key);
+		}
+		// now shuffle them
+		std::random_device rd;
+    	std::mt19937 g(rd());
+ 		std::shuffle(receive_item_keys.begin(), receive_item_keys.end(), g);
+
+		for(const auto& sending_process : receive_item_keys) {
+			const auto& receives = receive_item[sending_process];
+			const size_t number_of_receives = receives.size();
 
 			#ifdef DEBUG
 			if (sending_process == this->rank
@@ -9469,7 +9481,7 @@ private:
 
 			if (this->send_single_cells) {
 
-				for(const auto& item : sender.second) {
+				for(const auto& item : receives) {
 					const uint64_t cell = item.first;
 
 					if (destination.count(cell) == 0) {
@@ -9549,7 +9561,7 @@ private:
 				// reserve space for incoming user data in this end
 				// TODO: move into a separate function callable by user
 				for (size_t i = 0; i < number_of_receives; i++) {
-					const uint64_t cell = sender.second[i].first;
+					const uint64_t cell = receives[i].first;
 					if (destination.count(cell) == 0) {
 						destination[cell];
 					}
@@ -9561,7 +9573,7 @@ private:
 				std::vector<MPI_Datatype> datatypes(number_of_receives, MPI_DATATYPE_NULL);
 
 				for (size_t i = 0; i < number_of_receives; i++) {
-					const uint64_t cell = sender.second[i].first;
+					const uint64_t cell = receives[i].first;
 
 					std::tie(
 						addresses[i],
@@ -9658,10 +9670,20 @@ private:
 	) {
 		int ret_val = -1;
 
+		std::vector<int> send_item_keys;
+		send_item_keys.reserve(send_item.size());
+		// build up vector of keys
+		for(auto const& [key, val] : send_item){
+			send_item_keys.push_back(key);
+		}
+		// now shuffle them
+		std::random_device rd;
+    	std::mt19937 g(rd());
+ 		std::shuffle(send_item_keys.begin(), send_item_keys.end(), g);
 
-		for(const auto& receiver : send_item) {
-			const int receiving_process = receiver.first;
-			const size_t number_of_sends = receiver.second.size();
+		for(const auto& receiving_process : send_item_keys) {
+			const auto& sends = send_item[receiving_process];
+			const size_t number_of_sends = sends.size();
 
 			#ifdef DEBUG
 			if (receiving_process == this->rank
@@ -9675,7 +9697,7 @@ private:
 
 			if (this->send_single_cells) {
 
-				for(const auto& item : receiver.second) {
+				for(const auto& item : sends) {
 					const uint64_t cell = item.first;
 
 					this->send_requests[receiving_process].push_back(MPI_Request());
@@ -9754,7 +9776,7 @@ private:
 				std::vector<MPI_Datatype> datatypes(number_of_sends, MPI_DATATYPE_NULL);
 
 				for (size_t i = 0; i < number_of_sends; i++) {
-					const uint64_t cell = receiver.second[i].first;
+					const uint64_t cell = sends[i].first;
 
 					std::tie(
 						addresses[i],
