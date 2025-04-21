@@ -9460,7 +9460,7 @@ private:
 		// now shuffle them
 		std::random_device rd;
     	std::mt19937 g(rd());
- 		std::shuffle(receive_item_keys.begin(), receive_item_keys.end(), g);
+ 		//std::shuffle(receive_item_keys.begin(), receive_item_keys.end(), g);
 
 		for(const auto& sending_process : receive_item_keys) {
 			const auto& receives = receive_item.at(sending_process);
@@ -9679,7 +9679,7 @@ private:
 		// now shuffle them
 		std::random_device rd;
     	std::mt19937 g(rd());
- 		std::shuffle(send_item_keys.begin(), send_item_keys.end(), g);
+ 		//std::shuffle(send_item_keys.begin(), send_item_keys.end(), g);
 
 		for(const auto& receiving_process : send_item_keys) {
 			const auto& sends = send_item.at(receiving_process);
